@@ -1,5 +1,7 @@
 package com.example.gcy.photogallery;
 
+import android.graphics.drawable.Drawable;
+import android.nfc.Tag;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.v4.app.Fragment;
@@ -9,9 +11,7 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.TextView;
-
-import java.io.IOException;
+import android.widget.ImageView;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -27,12 +27,17 @@ public class PhotoGalleryFragment extends Fragment {
         return  new PhotoGalleryFragment();
     }
     private List<GalleryItem> mItems = new ArrayList<>();
+    private ThumbnailDownloader<PhotoHolder> mThumbnailDownloader;
 
     @Override
     public void onCreate(Bundle savedInstanceState){
         super.onCreate(savedInstanceState);
         setRetainInstance(true);
         new FetchItemsTask().execute();
+        mThumbnailDownloader = new ThumbnailDownloader<>();
+        mThumbnailDownloader.start();
+        mThumbnailDownloader.getLooper();
+        Log.i(TAG, "Background Thread starter");
     }
 
     @Override
@@ -42,6 +47,13 @@ public class PhotoGalleryFragment extends Fragment {
         mPhotoRecyclerView.setLayoutManager(new GridLayoutManager(getActivity(), 3));
         setupAdapter();
         return  v;
+    }
+
+    @Override
+    public void onDestroy(){
+        super.onDestroy();
+        mThumbnailDownloader.quit();
+        Log.i(TAG, "Background thread destroyed");
     }
 
     private void setupAdapter(){
@@ -64,15 +76,15 @@ public class PhotoGalleryFragment extends Fragment {
     }
 
     private class PhotoHolder extends RecyclerView.ViewHolder{
-        private TextView mTitleTextView;
+        private ImageView mItemImageView;
 
         public PhotoHolder(View itemView){
             super(itemView);
-            mTitleTextView = (TextView)itemView;
+            mItemImageView = (ImageView)itemView.findViewById(R.id.fragment_photo_image_view);
         }
 
-        public void bindGalleryItem(GalleryItem item){
-            mTitleTextView.setText(item.toString());
+        public void bindDrawable(Drawable drawable){
+            mItemImageView.setImageDrawable(drawable);
         }
     }
 
@@ -85,14 +97,17 @@ public class PhotoGalleryFragment extends Fragment {
 
         @Override
         public PhotoHolder onCreateViewHolder(ViewGroup viewGroup, int viewType){
-            TextView textView = new TextView(getActivity());
-            return new PhotoHolder(textView);
+            LayoutInflater inflater = LayoutInflater.from(getActivity());
+            View view = inflater.inflate(R.layout.gallery_item, viewGroup, false);
+            return new PhotoHolder(view);
         }
 
         @Override
         public void onBindViewHolder(PhotoHolder photoHolder, int position){
             GalleryItem galleryItem = mGalleryItems.get(position);
-            photoHolder.bindGalleryItem(galleryItem);
+            Drawable placeholder = getResources().getDrawable(R.drawable.bill_up_close);
+            photoHolder.bindDrawable(placeholder);
+            mThumbnailDownloader.quequThumbnail(photoHolder, galleryItem.getUrl());
         }
 
         @Override
